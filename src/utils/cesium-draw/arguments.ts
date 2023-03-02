@@ -8,8 +8,8 @@
  */
 import { Viewer } from "cesium";
 
-interface Arg {
+interface Option {
   viewer: Viewer;
 }
 
-export type { Arg };
+export type { Option };

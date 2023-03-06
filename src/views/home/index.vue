@@ -2,22 +2,19 @@
  * @Author: yyshu 2671255784@qq.com
  * @Date: 2023-02-07 22:22:57
  * @LastEditors: yyshu yyshu@hisw.cn
- * @LastEditTime: 2023-03-02 17:45:08
+ * @LastEditTime: 2023-03-06 10:25:48
  * @FilePath: \vite\vite-cesium-mapbox\src\views\home\index.vue
  * @Description: 首页
 -->
 <script setup lang="ts">
 import { onMounted } from "vue";
-import VScaleScreen from "v-scale-screen"; // 适配组件
 import {
   Viewer,
   Color,
-  createWorldTerrain,
-  ArcGisMapServerImageryProvider,
-  CesiumTerrainProvider,
-  ScreenSpaceEventHandler,
-  ScreenSpaceEventType,
   Cartesian3,
+  CallbackProperty,
+  JulianDate,
+  ScreenSpaceEventType,
 } from "cesium";
 import CardinalLine from "@/utils/cesium-draw/cardinalLine";
 import BezierLine from "@/utils/cesium-draw/bezierLine";
@@ -25,72 +22,19 @@ import BezierLine from "@/utils/cesium-draw/bezierLine";
 let viewer: Viewer | undefined;
 
 onMounted(() => {
-  viewer = new Viewer("box", {
-    animation: true,
-    skyBox: false,
-    skyAtmosphere: false,
-    baseLayerPicker: false,
-    // terrainProvider: createWorldTerrain(),
-    infoBox: false,
-    selectionIndicator: false,
-    shouldAnimate: true,
-    terrainProvider: new CesiumTerrainProvider({
-      url: "http://data.marsgis.cn/terrain",
-    }),
-  });
-  let ismove = false;
-  // 增加鼠标左键点击事件
-  if (viewer) {
-    let handler = new ScreenSpaceEventHandler(viewer.scene.canvas);
-    handler.setInputAction((e: ScreenSpaceEventHandler.PositionedEvent) => {
-      const posi = viewer!.scene.camera.pickEllipsoid(
-        e.position.clone(),
-        viewer!.scene.globe.ellipsoid
-      );
-      // const posi = viewer?.scene.pickPosition(e.position);
-      console.log(45, posi);
-      viewer!.entities.add({
-        position: posi,
-        point: {
-          pixelSize: 5,
-          color: Color.WHITE,
-          outlineColor: Color.fromCssColorString("#fff"),
-          outlineWidth: 2,
-          show: true,
-        },
-      });
-      // if (posi) {
-      //   if (!ismove) {
-      //     ismove = true;
-      //     viewer!.entities.add({
-      //       position: posi,
-      //       point: {
-      //         pixelSize: 5,
-      //         color: Color.WHITE,
-      //         outlineColor: Color.fromCssColorString("#fff"),
-      //         outlineWidth: 2,
-      //         show: true,
-      //       },
-      //     });
-      //   } else {
-      //     ismove = false;
-      //     handler.destroy();
-      //   }
-      // }
-    }, ScreenSpaceEventType.LEFT_CLICK);
-    // 鼠标移动方法
-    handler.setInputAction((e: ScreenSpaceEventHandler.PositionedEvent) => {
-      if (ismove) {
-        console.log(e);
-      }
-    }, ScreenSpaceEventType.MOUSE_MOVE);
-  }
+  viewer = new Viewer("box", {});
+  // 禁止默认左键事件
+  viewer.screenSpaceEventHandler.removeInputAction(
+    ScreenSpaceEventType.LEFT_CLICK
+  );
+  // viewer.imageryLayers.addImageryProvider()
+  test();
 });
 
 /**
  * 添加线1
  */
-const addEllipse1 = () => {
+const addEllipseC = () => {
   const cardinalLine = new CardinalLine({
     viewer: viewer!,
   });
@@ -99,7 +43,7 @@ const addEllipse1 = () => {
 /**
  * 添加线2
  */
-const addEllipse2 = () => {
+const addEllipseB = () => {
   const bezierLine = new BezierLine({
     viewer: viewer!,
   });
@@ -108,34 +52,74 @@ const addEllipse2 = () => {
 
 // 点击测试
 const test = () => {
-  console.log("点击测试");
-  const posi = Cartesian3.fromDegrees(121.987848, 30.897286);
-  viewer!.entities.add({
-    position: posi,
+  console.log("开始测试");
+  // 开始显示时间
+  const s3 = JulianDate.fromDate(new Date("2023-03-06T10:00:00+08:00"));
+  // 结束显示时间
+  const e3 = JulianDate.fromDate(new Date("2023-03-06T15:00:00+08:00"));
+  let isFlicker = false; // 是否闪烁过
+  let flickerStr = false; // 闪烁中的状态
+  const getShow = (time: JulianDate) => {
+    if (JulianDate.lessThan(time, s3)) {
+      // 情况1：未开始
+      return false;
+    } else {
+      if (JulianDate.lessThan(time, e3)) {
+        // 情况2：进行中
+        // 准备闪烁状态
+        if (!isFlicker) isFlicker = true;
+        return true;
+      } else {
+        // 情况3：已结束
+        // 开启闪烁状态
+        if (isFlicker) {
+          console.log("准备闪烁状态");
+          isFlicker = false; // 关闭闪烁状态
+          flickerStr = true; // 闪烁状态时，是否亮起的状态
+          const interval = 300;
+          // 闪烁i次
+          const shan = (i: number) => {
+            if (i >= 0) {
+              console.log("倒数第" + i + "次闪烁");
+              setTimeout(() => {
+                flickerStr = true;
+                setTimeout(() => {
+                  flickerStr = false;
+                  shan(i - 1);
+                }, interval);
+              }, interval);
+            }
+          };
+          // 闪烁5次
+          shan(3);
+        }
+        // 返回闪烁状态
+        return flickerStr;
+      }
+    }
+  };
+  viewer?.entities.add({
+    position: Cartesian3.fromDegrees(-85.02828, 43.351973, 10),
     point: {
-      pixelSize: 5,
-      color: Color.WHITE,
-      outlineColor: Color.fromCssColorString("#fff"),
-      outlineWidth: 2,
-      show: true,
+      show: new CallbackProperty(getShow, false),
+      pixelSize: 10,
+      color: Color.RED,
     },
   });
 };
 </script>
 
 <template>
-  <v-scale-screen width="1920" height="1080">
-    <div class="page">
-      <div class="page-left">
-        <button @click="addEllipse1()">添加线1</button>
-        <button @click="addEllipse2()">添加线2</button>
-        <button @click="test()">测试</button>
-      </div>
-      <div class="page-center">
-        <div id="box"></div>
-      </div>
+  <div class="page">
+    <div class="page-left">
+      <button @click="addEllipseC()">添加线C</button>
+      <button @click="addEllipseB()">添加线B</button>
+      <button @click="test()">测试</button>
     </div>
-  </v-scale-screen>
+    <div class="page-center">
+      <div id="box"></div>
+    </div>
+  </div>
 </template>
 
 <style scoped lang="scss">
@@ -158,6 +142,7 @@ const test = () => {
   width: 100%;
   height: 100%;
   #box {
+    width: 100%;
     height: 100%;
   }
 }
